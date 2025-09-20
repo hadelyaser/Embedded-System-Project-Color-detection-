@@ -1,0 +1,139 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Adafruit_NeoPixel.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// NeoPixel setup
+#define LED_PIN 3
+#define LED_COUNT 54
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// Color sensor pins
+#define S0 4
+#define S1 5
+#define S2 6
+#define S3 7
+#define sensorOut 8
+
+// Color ranges
+struct ColorRange {
+  int redMin, redMax;
+  int greenMin, greenMax;
+  int blueMin, blueMax;
+};
+
+ColorRange colors[] = {
+  {120, 140, 175, 250, 45, 65},   // Red
+  {160, 200, 140, 175, 40, 60},   // Green
+  {200, 250, 190, 240, 55, 70},   // Blue
+  {77, 125, 98, 150, 20, 45}      // Yellow
+};
+
+int redFreq, greenFreq, blueFreq;
+
+void setup() {
+  strip.begin();
+  strip.setBrightness(20);
+  setupInputsOutputs();
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("   Welcome to");
+  lcd.setCursor(0, 1);
+  lcd.print("    EduBot !!");
+  // Set all LEDs to white when starting
+  setAllLEDsWhite();
+  Serial.begin(9600);
+  delay(1000);
+}
+
+void loop() {
+  readFrequencies();
+  String color = detectColor();
+
+  if (color != "") {
+    showDetectedColorOnLCD(color);
+    Serial.print("Color: ");
+    Serial.println(color);
+    delay(500); // debounce delay
+  }
+}
+
+void setupInputsOutputs() {
+  pinMode(S0, OUTPUT);
+  pinMode(S1, OUTPUT);
+  pinMode(S2, OUTPUT);
+  pinMode(S3, OUTPUT);
+  pinMode(sensorOut, INPUT);
+  digitalWrite(S0, HIGH);
+  digitalWrite(S1, LOW);
+}
+
+void readFrequencies() {
+  digitalWrite(S2, LOW); digitalWrite(S3, LOW);
+  redFreq = pulseIn(sensorOut, LOW);
+  delay(10);
+
+  digitalWrite(S2, HIGH); digitalWrite(S3, HIGH);
+  greenFreq = pulseIn(sensorOut, LOW);
+  delay(10);
+
+  digitalWrite(S2, LOW); digitalWrite(S3, HIGH);
+  blueFreq = pulseIn(sensorOut, LOW);
+  delay(10);
+}
+
+String detectColor() {
+  if (inRange(redFreq, colors[0].redMin, colors[0].redMax) && 
+      inRange(greenFreq, colors[0].greenMin, colors[0].greenMax) && 
+      inRange(blueFreq, colors[0].blueMin, colors[0].blueMax)) return "Red";
+  
+  if (inRange(redFreq, colors[1].redMin, colors[1].redMax) && 
+      inRange(greenFreq, colors[1].greenMin, colors[1].greenMax) && 
+      inRange(blueFreq, colors[1].blueMin, colors[1].blueMax)) return "Green";
+  
+  if (inRange(redFreq, colors[2].redMin, colors[2].redMax) && 
+      inRange(greenFreq, colors[2].greenMin, colors[2].greenMax) && 
+      inRange(blueFreq, colors[2].blueMin, colors[2].blueMax)) return "Blue";
+  
+  if (inRange(redFreq, colors[3].redMin, colors[3].redMax) && 
+      inRange(greenFreq, colors[3].greenMin, colors[3].greenMax) && 
+      inRange(blueFreq, colors[3].blueMin, colors[3].blueMax)) return "Yellow";
+
+  return "";  // Return empty if no color matches
+}
+
+// Helper function to check if the value is in the specified range
+bool inRange(int value, int minVal, int maxVal) {
+  return value >= minVal && value <= maxVal;
+}
+
+void showDetectedColorOnLCD(String colorName) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Detected Color:");
+  lcd.setCursor(0, 1);
+  lcd.print(colorName);
+
+  uint32_t color;
+
+  if (colorName == "Red") color = strip.Color(255, 0, 0);
+  else if (colorName == "Green") color = strip.Color(0, 255, 0);
+  else if (colorName == "Blue") color = strip.Color(0, 0, 255);
+  else if (colorName == "Yellow") color = strip.Color(245, 188, 0);
+  else color = strip.Color(255, 255, 255);  // fallback to white if no color detected
+
+  for (int i = 0; i < LED_COUNT; i++) {
+    strip.setPixelColor(i, color);
+  }
+  strip.show();
+}
+
+void setAllLEDsWhite() {
+  for (int i = 0; i < LED_COUNT; i++) {
+    strip.setPixelColor(i, 255, 255, 255); // Set all LEDs to white
+  }
+  strip.show(); // Apply the changes
+}
