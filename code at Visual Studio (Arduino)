@@ -1,0 +1,62 @@
+import serial
+import time
+import pyttsx3
+import random
+import re
+
+# Setup text-to-speech
+engine = pyttsx3.init()
+engine.setProperty('rate', 150)
+
+def speak(text):
+    print("SPEAK:", text)
+    engine.say(text)
+    engine.runAndWait()
+
+# Connect to Arduino
+try:
+    arduino = serial.Serial('COM9', 9600, timeout=1)  # Change COM port if needed
+    time.sleep(2)
+    print("✅ Connected to Arduino")
+except Exception as e:
+    print("❌ Failed to connect to Arduino:", e)
+    exit()
+
+# Game settings
+colors = ["Red", "Green", "Blue", "Yellow"]
+rounds = 5
+score = 0
+
+# Game loop
+for round_num in range(1, rounds + 1):
+    print(f"\n🎮 Round {round_num} of {rounds}")
+    target_color = random.choice(colors)
+    speak(f"Round {round_num}. Please show me {target_color}")
+    print(f"WAITING for: {target_color}")
+
+    correct = False
+    attempt = 0
+
+    while not correct:
+        try:
+            line = arduino.readline().decode('utf-8').strip()
+            if line:
+                print(f"[ARDUINO] {line}")
+                match = re.search(r'Color:\s*(\w+)', line)
+                if match:
+                    detected = match.group(1)
+                    print(f"🎯 Detected: {detected}")
+                    attempt += 1
+                    if detected.lower() == target_color.lower():
+                        speak("Good job!")
+                        score += 1
+                        correct = True
+                        time.sleep(1.5)
+                    else:
+                        speak("Try again")
+        except Exception as e:
+            print("⚠️ Error reading from serial:", e)
+
+# Game over
+speak(f"You got it!!. Your score is {score} out of {rounds}")
+print(f"\n🏁 Final Score: {score} / {rounds}")
